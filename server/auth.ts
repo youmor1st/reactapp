@@ -129,6 +129,7 @@ export async function setupAuth(app: Express) {
 
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
+        console.error("Login error (strategy):", err);
         return res.status(500).json({ message: "Кіру кезінде қате орын алды" });
       }
       if (!user) {
@@ -137,6 +138,7 @@ export async function setupAuth(app: Express) {
 
       req.logIn(user, (loginErr) => {
         if (loginErr) {
+          console.error("Login error (req.logIn):", loginErr);
           return res.status(500).json({ message: "Кіру кезінде қате орын алды" });
         }
         return res.json({
