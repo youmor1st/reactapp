@@ -1,6 +1,5 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import session from "express-session";
 import type { Express, RequestHandler, Request } from "express";
 import connectPg from "connect-pg-simple";
@@ -65,59 +64,6 @@ export async function setupAuth(app: Express) {
     )
   );
 
-  // Google OAuth strategy for login/registration
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID: process.env.GOOGLE_CLIENT_ID || "",
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-        callbackURL:
-          process.env.GOOGLE_CALLBACK_URL ||
-          `${process.env.BASE_URL || "http://localhost:5000"}/api/auth/google/callback`,
-      },
-      async (_accessToken, _refreshToken, profile, done) => {
-        try {
-          const email = profile.emails?.[0]?.value;
-          if (!email) {
-            return done(null, false, { message: "Google аккаунтта email табылмады" });
-          }
-
-          let user = await storage.getUserByEmail(email);
-
-          if (!user) {
-            const firstName = profile.name?.givenName || "";
-            const lastName = profile.name?.familyName || "";
-
-            // Создаём случайный пароль, чтобы удовлетворить not null в БД
-            const randomPassword = randomBytes(16).toString("hex");
-            const hashedPassword = await bcrypt.hash(randomPassword, 10);
-
-            user = await storage.createUser({
-              email,
-              password: hashedPassword,
-              firstName,
-              lastName,
-              emailVerified: true,
-              verificationToken: null,
-              verificationTokenExpires: null,
-            });
-          } else if (!user.emailVerified) {
-            // Если пользователь уже есть, но email не подтверждён, считаем Google как подтверждение
-            user = await storage.updateUser(user.id, {
-              emailVerified: true,
-              verificationToken: null,
-              verificationTokenExpires: null,
-            });
-          }
-
-          return done(null, user);
-        } catch (error) {
-          return done(error as any);
-        }
-      },
-    ),
-  );
-
   passport.serializeUser((user: any, done) => {
     done(null, user.id);
   });
@@ -130,26 +76,6 @@ export async function setupAuth(app: Express) {
       done(error);
     }
   });
-
-  // Google OAuth endpoints
-  app.get(
-    "/api/auth/google",
-    passport.authenticate("google", {
-      scope: ["profile", "email"],
-    }),
-  );
-
-  app.get(
-    "/api/auth/google/callback",
-    passport.authenticate("google", {
-      failureRedirect: "/login?error=google",
-      session: true,
-    }),
-    (req, res) => {
-      // После успешной авторизации через Google перенаправляем в клиент
-      res.redirect("/");
-    },
-  );
 
   // Register endpoint
   app.post("/api/auth/register", async (req, res) => {
