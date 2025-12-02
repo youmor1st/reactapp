@@ -1,13 +1,13 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import session from "express-session";
 import type { Express, RequestHandler, Request } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
-import { registerSchema, loginSchema, verifyEmailSchema } from "@shared/schema";
-import { sendVerificationEmail } from "./email";
+import { registerSchema, loginSchema } from "@shared/schema";
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
@@ -38,7 +38,7 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Local strategy for login
+  // Local strategy for login (email + password)
   passport.use(
     new LocalStrategy(
       {
@@ -50,10 +50,6 @@ export async function setupAuth(app: Express) {
           const user = await storage.getUserByEmail(email);
           if (!user) {
             return done(null, false, { message: "Email немесе құпия сөз дұрыс емес" });
-          }
-
-          if (!user.emailVerified) {
-            return done(null, false, { message: "Email расталмаған. Растау хатын тексеріңіз." });
           }
 
           const isValidPassword = await bcrypt.compare(password, user.password);
@@ -69,6 +65,59 @@ export async function setupAuth(app: Express) {
     )
   );
 
+  // Google OAuth strategy for login/registration
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID || "",
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+        callbackURL:
+          process.env.GOOGLE_CALLBACK_URL ||
+          `${process.env.BASE_URL || "http://localhost:5000"}/api/auth/google/callback`,
+      },
+      async (_accessToken, _refreshToken, profile, done) => {
+        try {
+          const email = profile.emails?.[0]?.value;
+          if (!email) {
+            return done(null, false, { message: "Google аккаунтта email табылмады" });
+          }
+
+          let user = await storage.getUserByEmail(email);
+
+          if (!user) {
+            const firstName = profile.name?.givenName || "";
+            const lastName = profile.name?.familyName || "";
+
+            // Создаём случайный пароль, чтобы удовлетворить not null в БД
+            const randomPassword = randomBytes(16).toString("hex");
+            const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+            user = await storage.createUser({
+              email,
+              password: hashedPassword,
+              firstName,
+              lastName,
+              emailVerified: true,
+              verificationToken: null,
+              verificationTokenExpires: null,
+            });
+          } else if (!user.emailVerified) {
+            // Если пользователь уже есть, но email не подтверждён, считаем Google как подтверждение
+            user = await storage.updateUser(user.id, {
+              emailVerified: true,
+              verificationToken: null,
+              verificationTokenExpires: null,
+            });
+          }
+
+          return done(null, user);
+        } catch (error) {
+          return done(error as any);
+        }
+      },
+    ),
+  );
+
   passport.serializeUser((user: any, done) => {
     done(null, user.id);
   });
@@ -81,6 +130,26 @@ export async function setupAuth(app: Express) {
       done(error);
     }
   });
+
+  // Google OAuth endpoints
+  app.get(
+    "/api/auth/google",
+    passport.authenticate("google", {
+      scope: ["profile", "email"],
+    }),
+  );
+
+  app.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", {
+      failureRedirect: "/login?error=google",
+      session: true,
+    }),
+    (req, res) => {
+      // После успешной авторизации через Google перенаправляем в клиент
+      res.redirect("/");
+    },
+  );
 
   // Register endpoint
   app.post("/api/auth/register", async (req, res) => {
@@ -104,32 +173,19 @@ export async function setupAuth(app: Express) {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Generate verification token
-      const verificationToken = randomBytes(32).toString("hex");
-      const verificationTokenExpires = new Date();
-      verificationTokenExpires.setHours(verificationTokenExpires.getHours() + 24); // 24 hours
-
-      // Create user
+      // Create user (email сразу считается подтверждённым)
       const user = await storage.createUser({
         email,
         password: hashedPassword,
         firstName,
         lastName,
-        emailVerified: false,
-        verificationToken,
-        verificationTokenExpires,
+        emailVerified: true,
+        verificationToken: null,
+        verificationTokenExpires: null,
       });
 
-      // Send verification email
-      try {
-        await sendVerificationEmail(email, verificationToken, firstName || "Қолданушы");
-      } catch (emailError) {
-        console.error("Error sending verification email:", emailError);
-        // Don't fail registration if email fails
-      }
-
       res.status(201).json({
-        message: "Тіркелу сәтті! Растау хатын тексеріңіз.",
+        message: "Тіркелу сәтті! Енді жүйеге кіре аласыз.",
         userId: user.id,
       });
     } catch (error) {
@@ -174,41 +230,6 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  // Verify email endpoint
-  app.post("/api/auth/verify-email", async (req, res) => {
-    try {
-      const parseResult = verifyEmailSchema.safeParse(req.body);
-      if (!parseResult.success) {
-        return res.status(400).json({
-          message: "Деректер дұрыс емес",
-          errors: parseResult.error.errors,
-        });
-      }
-
-      const { token } = parseResult.data;
-
-      const user = await storage.getUserByVerificationToken(token);
-      if (!user) {
-        return res.status(400).json({ message: "Жарамсыз немесе мерзімі өткен токен" });
-      }
-
-      if (user.verificationTokenExpires && new Date() > user.verificationTokenExpires) {
-        return res.status(400).json({ message: "Токен мерзімі өткен" });
-      }
-
-      await storage.updateUser(user.id, {
-        emailVerified: true,
-        verificationToken: null,
-        verificationTokenExpires: null,
-      });
-
-      res.json({ message: "Email сәтті расталды" });
-    } catch (error) {
-      console.error("Error verifying email:", error);
-      res.status(500).json({ message: "Email растау кезінде қате орын алды" });
-    }
-  });
-
   // Logout endpoint
   app.post("/api/auth/logout", (req, res) => {
     req.logout(() => {
@@ -220,11 +241,6 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Авторизация қажет" });
-  }
-
-  const user = req.user as any;
-  if (!user.emailVerified) {
-    return res.status(403).json({ message: "Email расталмаған" });
   }
 
   return next();

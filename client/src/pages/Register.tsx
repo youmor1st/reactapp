@@ -27,7 +27,7 @@ export default function Register() {
     onSuccess: () => {
       toast({
         title: "Тіркелу сәтті",
-        description: "Растау хатын тексеріңіз. Email-діңізге жіберілген сілтемені басыңыз.",
+        description: "Енді өз email және құпия сөзіңізбен жүйеге кіре аласыз.",
       });
       setLocation("/login");
     },
