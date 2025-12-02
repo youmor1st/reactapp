@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
     "@rollup/rollup-linux-x64-gnu": "^4.24.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
@@ -100,8 +101,7 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
-    "@types/ws": "^8.5.13",
-    "@vitejs/plugin-react": "^4.7.0"
+    "@types/ws": "^8.5.13"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
