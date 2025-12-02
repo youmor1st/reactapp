@@ -5,8 +5,8 @@ import { rm, readFile } from "fs/promises";
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
 const allowlist = [
-  "better-sqlite3",
-  "connect-sqlite3",
+  "pg",
+  "connect-pg-simple",
   "date-fns",
   "drizzle-orm",
   "drizzle-zod",

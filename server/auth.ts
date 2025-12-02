@@ -2,7 +2,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
 import type { Express, RequestHandler, Request } from "express";
-import SQLiteStore from "connect-sqlite3";
+import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { storage } from "./storage";
@@ -11,12 +11,12 @@ import { sendVerificationEmail } from "./email";
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const SQLiteStoreSession = SQLiteStore(session);
-  const dbPath = process.env.DATABASE_PATH || "./database.sqlite";
-  const sessionStore = new SQLiteStoreSession({
-    db: dbPath,
-    table: "sessions",
-    dir: "./",
+  const pgStore = connectPg(session);
+  const sessionStore = new pgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: true,
+    ttl: sessionTtl,
+    tableName: "sessions",
   });
   return session({
     secret: process.env.SESSION_SECRET || "change-this-secret-key-in-production",

@@ -1,25 +1,23 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "@shared/schema";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { Pool } = pg;
 
-// Use local SQLite database file
-const dbPath = process.env.DATABASE_PATH || path.join(__dirname, "../database.sqlite");
-
-export const sqlite = new Database(dbPath);
-sqlite.pragma("journal_mode = WAL"); // Enable WAL mode for better concurrency
-
-export const db = drizzle(sqlite, { schema });
-
-// Run migrations on startup
-try {
-  migrate(db, { migrationsFolder: path.join(__dirname, "../migrations") });
-} catch (error) {
-  // Migrations folder might not exist yet, that's okay
-  console.log("Migrations folder not found, skipping migrations");
+if (!process.env.DATABASE_URL) {
+  console.error("\n❌ ОШИБКА: DATABASE_URL не установлен!\n");
+  console.error("Создайте файл .env в корне проекта со следующим содержимым:");
+  console.error("DATABASE_URL=postgresql://postgres:ваш_пароль@localhost:5432/projectapp");
+  console.error("SESSION_SECRET=ваш-секретный-ключ\n");
+  throw new Error(
+    "DATABASE_URL must be set. Format: postgresql://user:password@host:port/projectapp"
+  );
 }
+
+// Create connection pool
+// DATABASE_URL should include database name: postgresql://user:password@host:port/projectapp
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+export const db = drizzle(pool, { schema });
