@@ -99,15 +99,12 @@ export async function setupAuth(app: Express) {
       // Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Create user (email сразу считается подтверждённым)
+      // Create user
       const user = await storage.createUser({
         email,
         password: hashedPassword,
         firstName,
         lastName,
-        emailVerified: true,
-        verificationToken: null,
-        verificationTokenExpires: null,
       });
 
       res.status(201).json({

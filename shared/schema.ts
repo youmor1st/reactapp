@@ -22,9 +22,6 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  emailVerified: boolean("email_verified").default(false).notNull(),
-  verificationToken: varchar("verification_token"),
-  verificationTokenExpires: timestamp("verification_token_expires"),
   resetPasswordToken: varchar("reset_password_token"),
   resetPasswordExpires: timestamp("reset_password_expires"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -116,8 +113,3 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Құпия сөзді енгізіңіз"),
 });
 export type LoginInput = z.infer<typeof loginSchema>;
-
-export const verifyEmailSchema = z.object({
-  token: z.string().min(1, "Токен табылмады"),
-});
-export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
