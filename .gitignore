@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+database.sqlite
+database.sqlite-wal
+database.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
