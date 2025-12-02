@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: rest-express-app
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://postgres:45238@db:5432/projectapp
+      PORT: 3000
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+    command: npm run start
+
+  db:
+    image: postgres:16
+    container_name: rest-express-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 45238
+      POSTGRES_DB: projectapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
