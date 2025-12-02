@@ -4,9 +4,9 @@ import { rm, readFile } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
+// ВАЖНО: не бандлим connect-pg-simple, чтобы он мог прочитать свой table.sql из node_modules
 const allowlist = [
   "pg",
-  "connect-pg-simple",
   "date-fns",
   "drizzle-orm",
   "drizzle-zod",
