@@ -56,10 +56,10 @@
    - Repository: выберите ваш репозиторий
    - Environment: `Node`
    - **Install Command:** `npm install` (убедитесь, что devDependencies устанавливаются)
-   - **Build Command:** `npm run build`
+   - **Build Command:** `npm install && npm run build`
    - **Start Command:** `npm run start`
    - Instance Type: Free (или выберите платный)
-   - **Важно:** Если сборка не работает, попробуйте Build Command: `npm install && npm run build`
+   - **Важно:** Build Command должен включать `npm install` для установки всех зависимостей
 4. Добавьте PostgreSQL базу данных:
    - Dashboard → "New +" → "PostgreSQL"
    - Выберите "Free" план
@@ -226,14 +226,23 @@ npm run db:push
 
 ## ❓ Troubleshooting
 
-### Ошибка "tsx: not found" при сборке на Render
+### Ошибки при сборке на Render
 
-Если вы видите ошибку `sh: 1: tsx: not found`:
+#### Ошибка "tsx: not found" или "Cannot find package 'esbuild'"
 
-1. **Решение 1:** Убедитесь, что Build Command использует `npm install && npm run build` (уже исправлено в package.json)
-2. **Решение 2:** Если проблема сохраняется, измените Build Command на: `npm ci && npm run build`
-3. **Решение 3:** Убедитесь, что `tsx` находится в `devDependencies` (уже есть)
-4. **Решение 4:** Попробуйте использовать прямой путь в Build Command: `npm install && node_modules/.bin/tsx script/build.ts`
+Если вы видите ошибки типа `Cannot find package 'esbuild'` или `tsx: not found`:
+
+1. **Решение 1:** Убедитесь, что Build Command использует `npm install && npm run build`
+   - Это гарантирует установку всех зависимостей перед сборкой
+2. **Решение 2:** Если проблема сохраняется, попробуйте:
+   ```
+   npm ci && npm run build
+   ```
+3. **Решение 3:** Убедитесь, что все инструменты сборки (`tsx`, `esbuild`, `vite`) находятся в `devDependencies` (уже есть)
+4. **Решение 4:** Если ничего не помогает, попробуйте явно указать путь:
+   ```
+   npm install && ./node_modules/.bin/tsx script/build.ts
+   ```
 
 ### База данных не подключается
 - Проверьте `DATABASE_URL` в переменных окружения
